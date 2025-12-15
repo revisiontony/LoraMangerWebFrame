@@ -10,6 +10,7 @@ This node is a wrapper and **requires** the original extension to be installed a
 
 1.  **Install ComfyUI-Lora-Manager:** Use ComfyUI Manager or install manually from [willmiao/ComfyUI-Lora-Manager](https://github.com/willmiao/ComfyUI-Lora-Manager).
 2.  **Verify it works:** Ensure you can access the manager at `http://127.0.0.1:8000/loras` (or your specific port) in your browser before using this node.
+3.  Added my workflows to the github as examples for other users. 
 
 ## Installation
 
@@ -24,3 +25,5 @@ custom_nodes/
     ├── lora_frame.py
     └── js/
         └── lora_frame_v5.js
+
+
