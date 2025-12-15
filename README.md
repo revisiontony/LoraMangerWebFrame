@@ -9,7 +9,7 @@ A simple custom node that embeds the full [ComfyUI-Lora-Manager](https://github.
 This node is a wrapper and **requires** the original extension to be installed and active.
 
 1.  **Install ComfyUI-Lora-Manager:** Use ComfyUI Manager or install manually from [willmiao/ComfyUI-Lora-Manager](https://github.com/willmiao/ComfyUI-Lora-Manager).
-2.  **Verify it works:** Ensure you can access the manager at `http://127.0.0.1:8188/loras` (or your specific port) in your browser before using this node.
+2.  **Verify it works:** Ensure you can access the manager at `http://127.0.0.1:8000/loras` (or your specific port) in your browser before using this node.
 
 ## Installation
 
