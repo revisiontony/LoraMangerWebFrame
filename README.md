@@ -46,8 +46,17 @@ git clone https://github.com/revisiontony/LoraMangerWebFrame.git
 If your ComfyUI instance is running on a different port or remote address, you can update the target URL directly on the node:
 
 1. Click the Address Bar: Click the text input field at the top of the node displaying the URL
-2. Edit: Type in your specific address (e.g., `http://127.0.0.1:8000/loras`)
+2. Edit: Type in your specific address (e.g., `http://127.0.0.1:8000/checkpoints`)
 3. Refresh: Click the Update / Go button to reload the embedded frame
+
+### URL Persistence
+
+**The node automatically saves your custom URL!** When you change the URL and save your workflow (Ctrl+S), the custom URL is preserved. The next time you:
+- Load the workflow
+- Restart ComfyUI
+- Share the workflow with others
+
+...the custom URL will be automatically restored. Each node instance can remember its own URL, so you can have multiple nodes pointing to different pages (loras, checkpoints, embeddings, recipes, etc.).
 
 ## Example Workflows
 
