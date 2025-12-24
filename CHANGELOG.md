@@ -20,3 +20,5 @@
 - Updated README with port scanning instructions.
 - Improved startup reliability with proactive port discovery.
 
+### Bug Fix
+- Fixed  bug when switching workflows or new workflows are opened the smartport scan does not  affect those workflows.
