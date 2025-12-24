@@ -1,7 +1,7 @@
 [project]
 name = "lora-manager-web-frame"
 description = "A simple custom node that embeds the full ComfyUI-Lora-Manager web interface directly into your ComfyUI workflow graph. This eliminates the need to have a separate browser tab open for managing your LoRAs and recipes."
-version = "1.0.1"
+version = "1.0.2"
 license = {text = "MIT"}
 dependencies = []
 
@@ -12,3 +12,4 @@ Repository = "https://github.com/revisiontony/Lora-Manager-Web-Frame"
 PublisherId = "revybevy"
 DisplayName = "Lora-Manager-Web-Frame"
 Icon = ""
+
