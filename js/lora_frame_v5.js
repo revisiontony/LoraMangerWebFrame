@@ -17,8 +17,8 @@ app.registerExtension({
 				const savedUrl = this.widgets_values?.[0] ?? defaultUrl;
 				const urlWidget = this.addWidget("text", "URL", savedUrl, () => {}, {});
 				
-				this.addWidget("button", "Update / Go", null, () => {
-					loadURL(urlWidget.value);
+				this.addWidget("button", "Port Scan", null, async () => {
+					await performPortScan();
 				});
 
 				// Create iframe with security sandbox
@@ -53,13 +53,76 @@ app.registerExtension({
 					hideOnZoom: false
 				});
 
+				// Port scanning logic to find Lora Manager (ports 8000-8005)
+				async function performPortScan() {
+					console.log("LoraWebFrame: Starting discovery...");
+					
+					// Strategy 1: Try current window origin first (most likely correct if Lora Manager is installed)
+					const originUrl = `${window.location.origin}/loras`;
+					try {
+						const originCheck = await fetch(originUrl, { method: 'HEAD', cache: 'no-cache' });
+						if (originCheck.ok) {
+							console.log(`LoraWebFrame: Found Lora Manager on current origin: ${originUrl}`);
+							urlWidget.value = originUrl;
+							loadURL(originUrl, true);
+							return true;
+						}
+					} catch (e) {
+						console.log("LoraWebFrame: Current origin check failed, trying server-side scan");
+					}
+
+					// Strategy 2: Try server-side scan (bypass CORS/caching)
+					try {
+						const response = await fetch('/lora-web-frame/scan-port');
+						if (response.ok) {
+							const data = await response.json();
+							if (data.url) {
+								console.log(`LoraWebFrame: Found Lora Manager via server-side scan: ${data.url}`);
+								urlWidget.value = data.url;
+								loadURL(data.url, true);
+								return true;
+							}
+						}
+					} catch (e) {
+						console.error("LoraWebFrame: Server-side scan failed, falling back to basic scan", e);
+					}
+					
+					// Strategy 3: Brute force client-side scan (ports 8000-8005)
+					const ports = [8000, 8001, 8002, 8003, 8004, 8005];
+					for (const port of ports) {
+						const testUrl = `http://127.0.0.1:${port}/loras`;
+						// Skip if we already checked this port via origin
+						if (testUrl === originUrl) continue;
+						
+						try {
+							const controller = new AbortController();
+							const timeoutId = setTimeout(() => controller.abort(), 500);
+							await fetch(testUrl, { mode: 'no-cors', cache: 'no-cache', signal: controller.signal });
+							clearTimeout(timeoutId);
+							console.log(`LoraWebFrame: Found Lora Manager on port ${port} via fallback scan`);
+							urlWidget.value = testUrl;
+							loadURL(testUrl, true);
+							return true;
+						} catch (err) { continue; }
+					}
+					
+					console.error("LoraWebFrame: Lora Manager not found on ports 8000-8005 or current origin.");
+					return false;
+				}
+
 				// Helper function with URL validation
-				function loadURL(url) {
-					if (!url || iframe.src === url) return;
+				function loadURL(url, force = false) {
+					if (!url) return;
+					if (!force && iframe.src === url) return;
 					
 					try {
 						new URL(url);
-						iframe.src = url;
+						if (force) {
+							iframe.src = "about:blank";
+							setTimeout(() => { iframe.src = url; }, 50);
+						} else {
+							iframe.src = url;
+						}
 					} catch (e) {
 						console.error("LoraWebFrame: Invalid URL", url);
 					}
@@ -86,11 +149,12 @@ app.registerExtension({
 				};
 
 				// Delayed startup to allow ComfyUI initialization
-				setTimeout(() => {
+				setTimeout(async () => {
 					if (this.size[0] < 200) {
 						this.setSize([1200, 900]);
 					}
-					loadURL(urlWidget.value);
+					// Proactively scan for the correct port on startup
+					await performPortScan();
 					this.onResize(this.size);
 				}, 1000);
 
