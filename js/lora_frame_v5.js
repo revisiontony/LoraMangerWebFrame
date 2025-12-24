@@ -5,9 +5,11 @@ app.registerExtension({
 	async beforeRegisterNodeDef(nodeType, nodeData, app) {
 		if (nodeData.name === "LoraWebFrame") {
 			const onNodeCreated = nodeType.prototype.onNodeCreated;
+			const onConfigure = nodeType.prototype.onConfigure;
 			
 			nodeType.prototype.onNodeCreated = function () {
 				const r = onNodeCreated ? onNodeCreated.apply(this, arguments) : undefined;
+				const node = this;
 
 				// Configuration
 				const defaultUrl = "http://127.0.0.1:8000/loras";
@@ -15,9 +17,11 @@ app.registerExtension({
 
 				// Widget Setup - Load saved URL from workflow or use default
 				const savedUrl = this.widgets_values?.[0] ?? defaultUrl;
-				const urlWidget = this.addWidget("text", "URL", savedUrl, () => {}, {});
+				const urlWidget = this.addWidget("text", "URL", savedUrl, (v) => {
+					loadURL(v);
+				}, {});
 				
-				this.addWidget("button", "Port Scan", null, async () => {
+				const scanBtn = this.addWidget("button", "Port Scan", null, async () => {
 					await performPortScan();
 				});
 
@@ -55,55 +59,64 @@ app.registerExtension({
 
 				// Port scanning logic to find Lora Manager (ports 8000-8005)
 				async function performPortScan() {
+					if (scanBtn.label === "Scanning...") return;
+					const originalLabel = scanBtn.label || "Port Scan";
+					scanBtn.label = "Scanning...";
+					if (node.setDirtyCanvas) node.setDirtyCanvas(true, true);
+					
 					console.log("LoraWebFrame: Starting discovery...");
 					
-					// Strategy 1: Try current window origin first (most likely correct if Lora Manager is installed)
-					const originUrl = `${window.location.origin}/loras`;
 					try {
-						const originCheck = await fetch(originUrl, { method: 'HEAD', cache: 'no-cache' });
-						if (originCheck.ok) {
-							console.log(`LoraWebFrame: Found Lora Manager on current origin: ${originUrl}`);
-							urlWidget.value = originUrl;
-							loadURL(originUrl, true);
-							return true;
-						}
-					} catch (e) {
-						console.log("LoraWebFrame: Current origin check failed, trying server-side scan");
-					}
-
-					// Strategy 2: Try server-side scan (bypass CORS/caching)
-					try {
-						const response = await fetch('/lora-web-frame/scan-port');
-						if (response.ok) {
-							const data = await response.json();
-							if (data.url) {
-								console.log(`LoraWebFrame: Found Lora Manager via server-side scan: ${data.url}`);
-								urlWidget.value = data.url;
-								loadURL(data.url, true);
+						// Strategy 1: Try current window origin first (most likely correct if Lora Manager is installed)
+						const originUrl = `${window.location.origin}/loras`;
+						try {
+							const originCheck = await fetch(originUrl, { method: 'HEAD', cache: 'no-cache' });
+							if (originCheck.ok) {
+								console.log(`LoraWebFrame: Found Lora Manager on current origin: ${originUrl}`);
+								urlWidget.value = originUrl;
+								loadURL(originUrl, true);
 								return true;
 							}
+						} catch (e) {
+							console.log("LoraWebFrame: Current origin check failed, trying server-side scan");
 						}
-					} catch (e) {
-						console.error("LoraWebFrame: Server-side scan failed, falling back to basic scan", e);
-					}
-					
-					// Strategy 3: Brute force client-side scan (ports 8000-8005)
-					const ports = [8000, 8001, 8002, 8003, 8004, 8005];
-					for (const port of ports) {
-						const testUrl = `http://127.0.0.1:${port}/loras`;
-						// Skip if we already checked this port via origin
-						if (testUrl === originUrl) continue;
-						
+
+						// Strategy 2: Try server-side scan (bypass CORS/caching)
 						try {
-							const controller = new AbortController();
-							const timeoutId = setTimeout(() => controller.abort(), 500);
-							await fetch(testUrl, { mode: 'no-cors', cache: 'no-cache', signal: controller.signal });
-							clearTimeout(timeoutId);
-							console.log(`LoraWebFrame: Found Lora Manager on port ${port} via fallback scan`);
-							urlWidget.value = testUrl;
-							loadURL(testUrl, true);
-							return true;
-						} catch (err) { continue; }
+							const response = await fetch('/lora-web-frame/scan-port');
+							if (response.ok) {
+								const data = await response.json();
+								if (data.url) {
+									console.log(`LoraWebFrame: Found Lora Manager via server-side scan: ${data.url}`);
+									urlWidget.value = data.url;
+									loadURL(data.url, true);
+									return true;
+								}
+							}
+						} catch (e) {
+							console.error("LoraWebFrame: Server-side scan failed, falling back to basic scan", e);
+						}
+						
+						// Strategy 3: Brute force client-side scan (ports 8000-8005)
+						const ports = [8000, 8001, 8002, 8003, 8004, 8005];
+						for (const port of ports) {
+							const testUrl = `http://127.0.0.1:${port}/loras`;
+							if (testUrl === originUrl) continue;
+							
+							try {
+								const controller = new AbortController();
+								const timeoutId = setTimeout(() => controller.abort(), 500);
+								await fetch(testUrl, { mode: 'no-cors', cache: 'no-cache', signal: controller.signal });
+								clearTimeout(timeoutId);
+								console.log(`LoraWebFrame: Found active port ${port} via fallback scan`);
+								urlWidget.value = testUrl;
+								loadURL(testUrl, true);
+								return true;
+							} catch (err) { continue; }
+						}
+					} finally {
+						scanBtn.label = originalLabel;
+						if (node.setDirtyCanvas) node.setDirtyCanvas(true, true);
 					}
 					
 					console.error("LoraWebFrame: Lora Manager not found on ports 8000-8005 or current origin.");
@@ -158,6 +171,17 @@ app.registerExtension({
 					this.onResize(this.size);
 				}, 1000);
 
+				return r;
+			};
+
+			nodeType.prototype.onConfigure = function (config) {
+				const r = onConfigure ? onConfigure.apply(this, arguments) : undefined;
+				// Trigger discovery when the node is configured (loaded from workflow)
+				setTimeout(() => {
+					if (this.widgets && this.widgets[1] && this.widgets[1].name === "Port Scan") {
+						this.widgets[1].callback();
+					}
+				}, 500);
 				return r;
 			};
 		}
